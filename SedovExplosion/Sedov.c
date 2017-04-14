@@ -18,6 +18,7 @@
 //------------------------------------------------------------------------------
 #define man "./sedov.x "
 #define FLOAT float
+#define atm 101325
 void allocate2d(FLOAT* arr);
 void index(int i, int j);
 
@@ -36,7 +37,7 @@ FLOAT blast = pow(10.0,10.0);
 // Gas temperature in Kelvin
 FLOAT T = 300.0;
 // Gas Pressure in Pascals
-FLOAT P = 
+FLOAT P = 1.0*atm; 
 
 
 
