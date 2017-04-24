@@ -29,10 +29,14 @@
 #define atm 101325
 #define cv (3.0/2.0)
 #define gamma (5.0/3.0)
+#define bool int
+#define true 1
+#define false 0
 void allocateAll();
 int indexx(int i, int j, int k);
 void __init__();
 FLOAT getDT();
+void allocate3d(FLOAT*** vec);
 void evolveU(float dt,float dx);
 void updateF();
 
@@ -57,10 +61,10 @@ FLOAT rho_ini;
 // Velocity v
 // Pressure p, internal energy e per unit mass, density rho, total energy E per unit volume
 FLOAT e;
-FLOAT** v;
-FLOAT* p;
-FLOAT* E;
-FLOAT* rho;
+FLOAT**** v;
+FLOAT*** p;
+FLOAT*** E;
+FLOAT*** rho;
 /*
  * AUXILIAR VECTORS THAT FOLLOW WAVE EQ Ut + (d/dxi)Fi = 0
  *      | rho    |           |  rho*vi                   |                                        
@@ -70,8 +74,8 @@ FLOAT* rho;
  *      | rho*E  |           |  (rho*E+p)*vi             |      
  *
  */             
-FLOAT** U;
-FLOAT*** F;
+FLOAT**** U;
+FLOAT***** F;
 
 //------------------------------------------------------------------------------
 //   MAIN
@@ -130,34 +134,24 @@ int main(int argc, char** argv){
  *
  */
 void allocateAll(){
-	v = malloc(3*sizeof(FLOAT*));
-	U = malloc(5*sizeof(FLOAT*));
-	F = malloc(5*sizeof(FLOAT**));
+	v = malloc(3*sizeof(FLOAT***));
+	U = malloc(5*sizeof(FLOAT***));
+	F = malloc(5*sizeof(FLOAT****));
 	int i,j;
 	for( i = 0; i < 3; i++ ){
-		v[i] = malloc(N*N*N*sizeof(FLOAT));
-		F[i] = malloc(5*sizeof(FLOAT*));
+		allocate3d(v[i]);
+		F[i] = malloc(5*sizeof(FLOAT***));
 		for( j = 0; j < 5; j++ ){
-			F[i][j] = malloc(N*N*N*sizeof(FLOAT));
+			allocate3d(F[i][j]);
 		}
 	}
 	for( j = 0; j < 5; j++ ){
-		U[j] = malloc(N*N*N*sizeof(FLOAT));
+		allocate3d(U[j]);
 	}	
-	p = malloc(N*N*N*sizeof(FLOAT));
-	rho = malloc(N*N*N*sizeof(FLOAT));
-	E = malloc(N*N*N*sizeof(FLOAT));
+	allocate3d(p);
+	allocate3d(rho);
+	allocate3d(E);
 }
-
-/*
- * Gets unidimentional index given position i,j,k
- * i,j,k < N
- *
- */
-int indexx(int i, int j, int k){
-	return (int) N*N*i + N*j + k;
-}
-
 
 /*
  * Initializes variables according to the corresponding initial conditions
@@ -168,43 +162,54 @@ void __init__(){
 	int i;
 	int j;
 	int k;
+	int l;
+	int m;
+	int n;
 	// Fills variables as if it was a normal ideal gas
-	for( k = 0; k < N*N*N; k++ ){
-		p[k] = P;
-		v[0][k] = 0.0;
-		v[1][k] = 0.0;
-		v[2][k] = 0.0;
-		rho[k]  = rho_ini;
-		// Initial velocity is 0, so Total energy E is only internal
-		// E = rho(e+(1/2)*|v^2|)
-		E[k]    = rho_ini*e;
+	for( i = 0; i < N; i++){
+		for( j = 0; j < N; j++){
+			for( k = 0; k < N; k++){
+				p[i][j][k] = P;
+				v[0][i][j][k] = 0.0;
+				v[1][i][j][k] = 0.0;
+				v[2][i][j][k] = 0.0;
+				rho[i][j][k]  = rho_ini;
+				// Initial velocity is 0, so Total energy E is only internal
+				// E = rho(e+(1/2)*|v^2|)
+				E[i][j][k]    = rho_ini*e;
+			}
+		}
 	}
 
 	// Sedovs blast energy is corrected for the blast (4m side)
-	E[indexx(N/2  ,N/2  ,N/2  )] = rho_ini*blast;
-	E[indexx(N/2-1,N/2  ,N/2  )] = rho_ini*blast;
-	E[indexx(N/2  ,N/2-1,N/2  )] = rho_ini*blast;
-	E[indexx(N/2  ,N/2  ,N/2-1)] = rho_ini*blast;
-	E[indexx(N/2-1,N/2-1,N/2  )] = rho_ini*blast;
-	E[indexx(N/2  ,N/2-1,N/2-1)] = rho_ini*blast;
-	E[indexx(N/2-1,N/2  ,N/2-1)] = rho_ini*blast;
-	E[indexx(N/2-1,N/2-1,N/2-1)] = rho_ini*blast;
-
-	for( k = 0; k < N*N*N; k++ ){
-		// Defining F
-		for( j = 0; j < 3; j++ ){
-			F[j][0][k] = rho[k]*v[j][k];
-			for( i = 1; i < 4; i++ ){
-				F[j][i][k] = rho[k]*v[j][k]*v[i-1][k] + (j==(i-1))*p[k];//delta_j,i-1 = (j==(i-1))
+	E[N/2  ][N/2  ][N/2  ] = rho_ini*blast;
+	E[N/2-1][N/2  ][N/2  ] = rho_ini*blast;
+	E[N/2  ][N/2-1][N/2  ] = rho_ini*blast;
+	E[N/2  ][N/2  ][N/2-1] = rho_ini*blast;
+	E[N/2  ][N/2-1][N/2-1] = rho_ini*blast;
+	E[N/2-1][N/2  ][N/2-1] = rho_ini*blast;
+	E[N/2-1][N/2-1][N/2  ] = rho_ini*blast;
+	E[N/2-1][N/2-1][N/2-1] = rho_ini*blast;
+	for( l = 0; l < N; l++){
+		for( m = 0; m < N; m++){
+			for( n = 0; n < N; n++){
+				// Defining F
+				for( j = 0; j < 3; j++ ){
+					F[j][0][l][m][n] = rho[l][m][n]*v[j][l][m][n];
+					for( i = 1; i < 4; i++ ){
+						F[j][i][l][m][n] = rho[l][m][n]*v[j][l][m][n]*v[i-1][l][m][n] + (j==(i-1))*p[l][m][n];
+						//delta_j,i-1 = (j==(i-1))
+					}
+					F[j][4][l][m][n] = (rho[l][m][n]*E[l][m][n]+p[l][m][n])*v[j][l][m][n];
+				}
+				// Defining U
+				U[0][l][m][n] = rho[l][m][n];
+				for( i = 1; i < 4; i++ ){
+						U[i][l][m][n] = rho[l][m][n]*v[i-1][l][m][n];
+				}
+				U[4][l][m][n] = rho[l][m][n]*E[l][m][n];
 			}
-			F[j][4][k] = (rho[k]*E[k]+p[k])*v[j][k];
 		}
-		// Defining U
-		U[0][k] = rho[k];
-		for( i = 1; i < 4; i++ ){
-				U[i][k] = rho[k]*v[i-1][k];
-		}
-		U[4][k] = rho[k]*E[k];
 	}
 }
 
@@ -221,27 +226,47 @@ void __init__(){
 void evolveU(float dt,float dx){
 	// Creates new array to avoid over-evolving
 	int i,j,k,l;
-	FLOAT** U_new = malloc(5*sizeof(FLOAT*));
+	FLOAT**** U_new = malloc(5*sizeof(FLOAT***));
 	for( i = 0; i < 5; i++){
-		U_new[i] = malloc(N*N*N*sizeof(FLOAT));
+		allocate3d(U_new[i]);
 	}
-	for( l = 0; l < 5; l++){		
+	for( l = 0; l < 5; l++){
 		for( i = 1; i < N-1; i++){
 			for( j = 1; j < N-1; j++){
+				// Central volumes		
 				for( k = 1; k < N-1; k++){
-					// Defines indices n,s,e,w,up,down and center ce
-					int e    = indexx(i+1,j  ,k  );
-					int w    = indexx(i-1,j  ,k  );
-					int n    = indexx(i  ,j+1,k  );
-					int s    = indexx(i  ,j-1,k  );
-					int up   = indexx(i  ,j  ,k+1);
-					int down = indexx(i  ,j  ,k-1);
-					int ce   = indexx(i  ,j  ,k  );		
-					U_new[l][ce]=U[l][ce]-(0.5*dt/dx)*(F[0][l][e]+F[1][l][n]+F[2][l][up]-F[0][l][w]-F[1][l][s]-F[2][l][down]);
+					U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
+					-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]-F[2][l][i][j][k-1]);
 				}
-					
+				// Boundary conditions (faces of the cube)
+				//////////////////////////////////////////////// DOWN
+				k = 0;			
+				U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
+				-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]+(F[2][l][i][j][k]));//6
+				////////////////////////////////////////////////// UP				
+				k = N-1;
+				U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]-(F[2][l][i][j][k])
+				-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]-F[2][l][i][j][k-1]);//3
+				////////////////////////////////////////////////// SOUTH (INDICES ARE PERMUTATED)				
+				k = 0;
+				U_new[l][j][k][i]=U[l][j][k][i]-(0.5*dt/dx)*(F[0][l][j+1][k][i]+F[1][l][j][k+1][i]+F[2][l][j][k][i+1]
+				-F[0][l][j-1][k][i]+(F[1][l][j][k][i])-F[2][l][j][k][i-1]);//5
+				////////////////////////////////////////////////// NORTH			
+				k = N-1;
+				U_new[l][j][k][i]=U[l][j][k][i]-(0.5*dt/dx)*(F[0][l][j+1][k][i]-(F[1][l][j][k][i])+F[2][l][j][k][i+1]
+				-F[0][l][j-1][k][i]-F[1][l][j][k-1][i]-F[2][l][j][k][i-1]);//2				
+				////////////////////////////////////////////////// WEST			
+				k = 0;
+				U_new[l][k][i][j]=U[l][k][i][j]-(0.5*dt/dx)*(F[0][l][k+1][i][j]+F[1][l][k][i+1][j]+F[2][l][k][i][j+1]
+				+(F[0][l][k][i][j])-F[1][l][k][i-1][j]-F[2][l][k][i][j-1]);//4
+				////////////////////////////////////////////////// EAST			
+				k = N-1;
+				U_new[l][k][i][j]=U[l][k][i][j]-(0.5*dt/dx)*(-(F[0][l][k][i][j])+F[1][l][k][i+1][j]+F[2][l][k][i][j+1]
+				-F[0][l][k][i][j]-F[1][l][k][i-1][j]-F[2][l][k][i][j-1]);//1
+				
 			}
 		}
+		
 	}
 	
 
@@ -254,14 +279,26 @@ void updateF(){
 }
 
 
-
-
+/*
+ * Allocates 3d vector
+ *
+ */
+void allocate3d(FLOAT*** vec){
+	int i,j;
+	vec = malloc(N*sizeof(FLOAT**));
+	for( i = 1; i < N-1; i++){
+			vec[i] = malloc(N*sizeof(FLOAT*));
+			for( j = 1; j < N-1; j++){
+				vec[i][j] = malloc(N*sizeof(FLOAT));
+		}
+	}
+}
 
 /*
  * Gets Vectors delta in time according to the sound speed boundary which defines stability
  *
  */
-FLOAT FLOAT getDT(){
+FLOAT getDT(){
 	// How to calculate sound speed?
 	return 0;
 }
