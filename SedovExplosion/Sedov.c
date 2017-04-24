@@ -114,7 +114,7 @@ int main(int argc, char** argv){
 		updateF();
 		
 
-		
+		time+=dt;
 	} while(go_on);
 	return 0;
 }
@@ -352,7 +352,6 @@ void evolveU(float dt,float dx){
 
 
 void updateF(){
-
 
 }
 
