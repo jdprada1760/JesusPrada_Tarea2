@@ -32,7 +32,9 @@
 void allocateAll();
 int indexx(int i, int j, int k);
 void __init__();
-FLOAT getSoundSpeed(FLOAT vx, FLOAT vy, FLOAT vz, FLOAT p, FLOAT rho);
+FLOAT getDT();
+void evolveU(float dt,float dx);
+void updateF();
 
 //------------------------------------------------------------------------------
 //   GLOBAL VARIABLES
@@ -93,7 +95,23 @@ int main(int argc, char** argv){
 	allocateAll();
 	// Variables are initialised
 	__init__();
-	
+	   //
+	  //  TIME EVOLUTION
+	 //
+	// Time variable t, deltas in position and time: dx,dt
+	FLOAT time = 0;
+	FLOAT dx = resol;
+	FLOAT dt = getDT();
+	bool go_on = true;
+	do{	
+		// Evolves vector U
+		evolveU(dt,dx);
+		// Updates Fs in terms of U
+		updateF();
+		
+
+		
+	} while(go_on);
 	return 0;
 }
 
@@ -190,13 +208,60 @@ void __init__(){
 	}
 }
 
+/*
+ * Evolves vector U given dx and dt according to the finite volume method
+ * Finite volume is performed over a volume-centered cubic uniform grid
+ * Volume integrals are approximated given variables constant over finite volumes
+ * Surface integrals are approximated given variables constant over square surfaces
+ * Values of variables on surfaces are calculated as the mean of the adjacent volumes
+ * Boundary conditions are taken as free boundary :
+ * (directional derivative perpendicular to the boundary surface vanishes) (This vanishes the respective surface integral)
+ *
+ */
+void evolveU(float dt,float dx){
+	// Creates new array to avoid over-evolving
+	int i,j,k,l;
+	FLOAT** U_new = malloc(5*sizeof(FLOAT*));
+	for( i = 0; i < 5; i++){
+		U_new[i] = malloc(N*N*N*sizeof(FLOAT));
+	}
+	for( l = 0; l < 5; l++){		
+		for( i = 1; i < N-1; i++){
+			for( j = 1; j < N-1; j++){
+				for( k = 1; k < N-1; k++){
+					// Defines indices n,s,e,w,up,down and center ce
+					int e    = indexx(i+1,j  ,k  );
+					int w    = indexx(i-1,j  ,k  );
+					int n    = indexx(i  ,j+1,k  );
+					int s    = indexx(i  ,j-1,k  );
+					int up   = indexx(i  ,j  ,k+1);
+					int down = indexx(i  ,j  ,k-1);
+					int ce   = indexx(i  ,j  ,k  );		
+					U_new[l][ce]=U[l][ce]-(0.5*dt/dx)*(F[0][l][e]+F[1][l][n]+F[2][l][up]-F[0][l][w]-F[1][l][s]-F[2][l][down]);
+				}
+					
+			}
+		}
+	}
+	
+
+}
+
+
+void updateF(){
+
+
+}
+
+
+
 
 
 /*
- * Gets Vectors U,F in terms of the vectors rho,E,p,v
+ * Gets Vectors delta in time according to the sound speed boundary which defines stability
  *
  */
-FLOAT getSoundSpeed(FLOAT vx, FLOAT vy, FLOAT vz, FLOAT p, FLOAT rho){
+FLOAT FLOAT getDT(){
 	// How to calculate sound speed?
 	return 0;
 }
