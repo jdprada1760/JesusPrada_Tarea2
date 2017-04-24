@@ -233,12 +233,12 @@ void evolveU(float dt,float dx){
 	for( l = 0; l < 5; l++){
 		for( i = 1; i < N-1; i++){
 			for( j = 1; j < N-1; j++){
-				// Central volumes		
+				// CENTRAL VOLUMES		
 				for( k = 1; k < N-1; k++){
 					U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
 					-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]-F[2][l][i][j][k-1]);
 				}
-				// Boundary conditions (faces of the cube)
+				// BOUNDARY CONDITIONS (EDGES of the cube)
 				//////////////////////////////////////////////// DOWN
 				k = 0;			
 				U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
@@ -263,13 +263,58 @@ void evolveU(float dt,float dx){
 				k = N-1;
 				U_new[l][k][i][j]=U[l][k][i][j]-(0.5*dt/dx)*(-(F[0][l][k][i][j])+F[1][l][k][i+1][j]+F[2][l][k][i][j+1]
 				-F[0][l][k][i][j]-F[1][l][k][i-1][j]-F[2][l][k][i][j-1]);//1
-				
 			}
+			// BOUNDARY CONDITIONS (EDGES of the cube)
+			//////////////////////////////////////////////// DOWN
+			k = 0;
+			j = 0;//SOUTH	
+			U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
+			-F[0][l][i-1][j][k]+(F[1][l][i][j][k])+(F[2][l][i][j][k]));//6,5
+			j = N-1;//NORTH
+			U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]-(F[1][l][i][j][k])+F[2][l][i][j][k+1]
+			-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]+(F[2][l][i][j][k]));//6,2
+			////////////////////////////////////////////////// UP				
+			k = N-1;
+			j = 0;// SOUTH
+			U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]-(F[2][l][i][j][k])
+			-F[0][l][i-1][j][k]+(F[1][l][i][j][k])-F[2][l][i][j][k-1]);//3,5
+			j = N-1;// NORTH
+			U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]-(F[1][l][i][j][k])-(F[2][l][i][j][k])
+			-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]-F[2][l][i][j][k-1]);//3,2
+			////////////////////////////////////////////////// SOUTH (INDICES ARE PERMUTATED)				
+			k = 0;
+			j = 0;// WEST
+			U_new[l][j][k][i]=U[l][j][k][i]-(0.5*dt/dx)*(F[0][l][j+1][k][i]+F[1][l][j][k+1][i]+F[2][l][j][k][i+1]
+			+(F[0][l][j][k][i])+(F[1][l][j][k][i])-F[2][l][j][k][i-1]);//5,4
+			j = N-1;// EAST
+			U_new[l][j][k][i]=U[l][j][k][i]-(0.5*dt/dx)*(-(F[0][l][j][k][i])+F[1][l][j][k+1][i]+F[2][l][j][k][i+1]
+			-F[0][l][j-1][k][i]+(F[1][l][j][k][i])-F[2][l][j][k][i-1]);//5,1
+			////////////////////////////////////////////////// NORTH			
+			k = N-1;
+			j = 0;// WEST
+			U_new[l][j][k][i]=U[l][j][k][i]-(0.5*dt/dx)*(F[0][l][j+1][k][i]-(F[1][l][j][k][i])+F[2][l][j][k][i+1]
+			+(F[0][l][j][k][i])-F[1][l][j][k-1][i]-F[2][l][j][k][i-1]);//2,4
+			j = N-1;// EAST	
+			U_new[l][j][k][i]=U[l][j][k][i]-(0.5*dt/dx)*(-(F[0][l][j][k][i])-(F[1][l][j][k][i])+F[2][l][j][k][i+1]
+			-F[0][l][j-1][k][i]-F[1][l][j][k-1][i]-F[2][l][j][k][i-1]);//2,1				
+			////////////////////////////////////////////////// WEST			
+			k = 0;
+			j = 0;// DOWN
+			U_new[l][k][i][j]=U[l][k][i][j]-(0.5*dt/dx)*(F[0][l][k+1][i][j]+F[1][l][k][i+1][j]+F[2][l][k][i][j+1]
+			+(F[0][l][k][i][j])-F[1][l][k][i-1][j]+(F[2][l][k][i][j]));//4,6
+			j = N-1;// UP
+			U_new[l][k][i][j]=U[l][k][i][j]-(0.5*dt/dx)*(F[0][l][k+1][i][j]+F[1][l][k][i+1][j]-(F[2][l][k][i][j])
+			+(F[0][l][k][i][j])-F[1][l][k][i-1][j]-F[2][l][k][i][j-1]);//4,3
+			////////////////////////////////////////////////// EAST			
+			k = N-1;
+			j = 0;// DOWN
+			U_new[l][k][i][j]=U[l][k][i][j]-(0.5*dt/dx)*(-(F[0][l][k][i][j])+F[1][l][k][i+1][j]+F[2][l][k][i][j+1]
+			-F[0][l][k][i][j]-F[1][l][k][i-1][j]+(F[2][l][k][i][j]));//1,6
+			j = N-1;// UP
+			U_new[l][k][i][j]=U[l][k][i][j]-(0.5*dt/dx)*(-(F[0][l][k][i][j])+F[1][l][k][i+1][j]-(F[2][l][k][i][j])
+			-F[0][l][k][i][j]-F[1][l][k][i-1][j]-F[2][l][k][i][j-1]);//1,3
 		}
-		
 	}
-	
-
 }
 
 
