@@ -35,8 +35,8 @@
 void allocateAll();
 int indexx(int i, int j, int k);
 void __init__();
-FLOAT getDT();
-void allocate3d(FLOAT*** vec);
+FLOAT getDT(FLOAT dx);
+FLOAT*** allocate3d();
 void evolveU(float dt,float dx);
 void updateF();
 
@@ -97,8 +97,10 @@ int main(int argc, char** argv){
 	N = ((FLOAT)L)/((FLOAT)resol);
 	// Variables are allocated
 	allocateAll();
+	printf("aal iis weell (ALLOCATION)N=%d\n",N);
 	// Variables are initialised
 	__init__();
+	printf("aal iis weell (INITIALIZATION)\n");
 	   //
 	  //  TIME EVOLUTION
 	 //
@@ -109,14 +111,19 @@ int main(int argc, char** argv){
 	bool go_on = true;
 	do{	
 		// Gets stable time difference
-		dt = getDT();
+		dt = getDT(dx);
+		printf("aal iis weell (DT)\n");
 		// Evolves vector U
 		evolveU(dt,dx);
+		printf("aal iis weell (EVOLVE)\n");
 		// Updates Fs in terms of U
 		updateF();
-		
-
+		printf("aal iis weell (UPDATE)\n");
+		printf("%f\n",time);
 		time+=dt;
+		if(time > 1){
+			go_on = false;
+		}
 	} while(go_on);
 	return 0;
 }
@@ -138,21 +145,21 @@ int main(int argc, char** argv){
 void allocateAll(){
 	v = malloc(3*sizeof(FLOAT***));
 	U = malloc(5*sizeof(FLOAT***));
-	F = malloc(5*sizeof(FLOAT****));
+	F = malloc(3*sizeof(FLOAT****));
 	int i,j;
 	for( i = 0; i < 3; i++ ){
-		allocate3d(v[i]);
+		v[i] = allocate3d();
 		F[i] = malloc(5*sizeof(FLOAT***));
 		for( j = 0; j < 5; j++ ){
-			allocate3d(F[i][j]);
+			F[i][j] = allocate3d();
 		}
 	}
 	for( j = 0; j < 5; j++ ){
-		allocate3d(U[j]);
+		U[j] = allocate3d();
 	}	
-	allocate3d(p);
-	allocate3d(rho);
-	allocate3d(E);
+	p = allocate3d();
+	rho = allocate3d();
+	E = allocate3d();
 }
 
 /*
@@ -161,28 +168,24 @@ void allocateAll(){
  */
 void __init__(){
 
-	int i;
-	int j;
-	int k;
-	int l;
-	int m;
-	int n;
+	int i,j,k,l,m,n;
 	// Fills variables as if it was a normal ideal gas
 	for( i = 0; i < N; i++){
 		for( j = 0; j < N; j++){
 			for( k = 0; k < N; k++){
-				p[i][j][k] = P;
+				   p[i][j][k] = P;
 				v[0][i][j][k] = 0.0;
 				v[1][i][j][k] = 0.0;
 				v[2][i][j][k] = 0.0;
-				rho[i][j][k]  = rho_ini;
+				 rho[i][j][k] = rho_ini;
 				// Initial velocity is 0, so Total energy E is only internal
 				// E = rho(e+(1/2)*|v^2|)
 				E[i][j][k]    = rho_ini*e;
+				//printf("aal iis weell (ALLOCATION)%d,%d,%d\n",i,j,k);
 			}
 		}
 	}
-
+	//printf("aal iis weell (VELOCITIES,E,rho,p)\n");
 	// Sedovs blast energy is corrected for the blast (4m side)
 	E[N/2  ][N/2  ][N/2  ] = rho_ini*blast;
 	E[N/2-1][N/2  ][N/2  ] = rho_ini*blast;
@@ -230,7 +233,7 @@ void evolveU(float dt,float dx){
 	int i,j,k,l;
 	FLOAT**** U_new = malloc(5*sizeof(FLOAT***));
 	for( i = 0; i < 5; i++){
-		allocate3d(U_new[i]);
+		U_new[i] = allocate3d();
 	}
 	for( l = 0; l < 5; l++){
 		for( i = 1; i < N-1; i++){
@@ -386,15 +389,18 @@ void updateF(){
 				v[2][i][j][k] = U[3][i][j][k]/rho[i][j][k];
 				E[i][j][k]    = U[4][i][j][k];
 				FLOAT e_temp  = (E[i][j][k]/rho[i][j][k]) - 0.5*(pow(v[0][i][j][k],2)+pow(v[1][i][j][k],2)+pow(v[2][i][j][k],2));
-				p[i][j][k]    = (gamma-1)*rho[i][j][k]*e;
+				p[i][j][k]    = (gamma-1)*rho[i][j][k]*e_temp;
+				//printf("11\n");
 				// From usual variables to auxiliar Fi
-				for( l = 0; l < 3; i++ ){
+				for( l = 0; l < 3; l++ ){
 					F[l][0][i][j][k] = rho[i][j][k]*v[l][i][j][k];
 					for( m = 1; m < 4; m++ ){
-						F[l][m][i][j][k] = rho[i][j][k]*v[l][i][j][k]*v[l-1][i][j][k] + (l==(m-1))*p[i][j][k];
+						F[l][m][i][j][k] = rho[i][j][k]*v[l][i][j][k]*v[m-1][i][j][k] + (l==(m-1))*p[i][j][k];
 						//delta_j,i-1 = (j==(i-1))
 					}
 					F[l][4][i][j][k] = (rho[i][j][k]*E[i][j][k]+p[i][j][k])*v[l][i][j][k];
+				}
+				//printf("12\n");
 			}
 		}
 	}
@@ -405,24 +411,49 @@ void updateF(){
  * Allocates 3d vector
  *
  */
-void allocate3d(FLOAT*** vec){
+FLOAT*** allocate3d(){
 	int i,j;
-	vec = malloc(N*sizeof(FLOAT**));
-	for( i = 1; i < N-1; i++){
-			vec[i] = malloc(N*sizeof(FLOAT*));
-			for( j = 1; j < N-1; j++){
-				vec[i][j] = malloc(N*sizeof(FLOAT));
+	FLOAT*** vec = malloc(N*sizeof(FLOAT**));
+	for( i = 0; i < N; i++){
+		vec[i] = malloc(N*sizeof(FLOAT*));
+		for( j = 0; j < N; j++){
+			vec[i][j] = malloc(N*sizeof(FLOAT));
 		}
 	}
+	return vec;
 }
 
 /*
  * Gets Vectors delta in time according to the sound speed boundary which defines stability
  *
  */
-FLOAT getDT(){
-	// How to calculate sound speed?
-	return 0;
+FLOAT getDT(float dx){
+	// Sound speed is calculated as sqrt((gamma+1)h) h = E + p/rho
+	// Calculates maximum sound speed and maximum velocity 
+	int i,j,k;
+	FLOAT cmax = -1;
+	FLOAT vmax = -1;
+	for( i = 0; i < N; i++){
+		for( j = 0; j < N; j++){
+			for( k = 0; k < N; k++){
+				FLOAT c_now = sqrt((gamma+1)*(E[i][j][k]+p[i][j][k]/rho[i][j][k]));
+				// Actualizes maximums if necessary
+				if( c_now > cmax ){
+					cmax = c_now;
+				}
+				if( abs(v[0][i][j][k]) > vmax ){
+					vmax = v[0][i][j][k];
+				}
+				if( abs(v[1][i][j][k]) > vmax ){
+					vmax = abs(v[1][i][j][k]);
+				}
+				if( abs(v[2][i][j][k]) > vmax ){
+					vmax = abs(v[2][i][j][k]);
+				}	
+			}
+		}
+	}
+	return dx/(vmax+cmax);
 }
 
 
