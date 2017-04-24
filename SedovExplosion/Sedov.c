@@ -348,11 +348,39 @@ void evolveU(float dt,float dx){
 	U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(-(F[0][l][i][j][k])-(F[1][l][i][j][k])-(F[2][l][i][j][k])
 	-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]-F[2][l][i][j][k-1]);//3,2,1				
 	}
+	// Passes from U_new to U
+	for( l = 0; l < 5; l++){
+		for( i = 1; i < N-1; i++){
+			for( j = 1; j < N-1; j++){
+				for( k = 1; k < N-1; k++){
+					U[l][i][j][k] = U_new[l][i][j][k];	
+				}
+			}
+		}
+	}
+	// Free memory for U_new
+	for( l = 0; l < 5; l++){	
+		for( i = 0; i < N; i++){
+			for( j = 0; j < N; j++){
+				free(U_new[l][i][j]);
+			}
+			free(U_new[l][i]);
+		}
+		free(U_new[l]);
+	}
+	free(U_new);
 }
 
 
 void updateF(){
-
+	int i,j,k;
+	for( i = 0; i < N; i++){
+		for( j = 0; j < N; j++){
+			for( k = 0; k < N; k++){
+			
+			}
+		}
+	}
 }
 
 
