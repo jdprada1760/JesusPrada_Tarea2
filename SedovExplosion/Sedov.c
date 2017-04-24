@@ -105,9 +105,11 @@ int main(int argc, char** argv){
 	// Time variable t, deltas in position and time: dx,dt
 	FLOAT time = 0;
 	FLOAT dx = resol;
-	FLOAT dt = getDT();
+	FLOAT dt;
 	bool go_on = true;
 	do{	
+		// Gets stable time difference
+		dt = getDT();
 		// Evolves vector U
 		evolveU(dt,dx);
 		// Updates Fs in terms of U
@@ -373,11 +375,26 @@ void evolveU(float dt,float dx){
 
 
 void updateF(){
-	int i,j,k;
+	int i,j,k,l,m;
 	for( i = 0; i < N; i++){
 		for( j = 0; j < N; j++){
 			for( k = 0; k < N; k++){
-			
+				// From auxiliar variable U to usual variables rho,p,E,v
+				rho[i][j][k]  = U[0][i][j][k];
+				v[0][i][j][k] = U[1][i][j][k]/rho[i][j][k];
+				v[1][i][j][k] = U[2][i][j][k]/rho[i][j][k];
+				v[2][i][j][k] = U[3][i][j][k]/rho[i][j][k];
+				E[i][j][k]    = U[4][i][j][k];
+				FLOAT e_temp  = (E[i][j][k]/rho[i][j][k]) - 0.5*(pow(v[0][i][j][k],2)+pow(v[1][i][j][k],2)+pow(v[2][i][j][k],2));
+				p[i][j][k]    = (gamma-1)*rho[i][j][k]*e;
+				// From usual variables to auxiliar Fi
+				for( l = 0; l < 3; i++ ){
+					F[l][0][i][j][k] = rho[i][j][k]*v[l][i][j][k];
+					for( m = 1; m < 4; m++ ){
+						F[l][m][i][j][k] = rho[i][j][k]*v[l][i][j][k]*v[l-1][i][j][k] + (l==(m-1))*p[i][j][k];
+						//delta_j,i-1 = (j==(i-1))
+					}
+					F[l][4][i][j][k] = (rho[i][j][k]*E[i][j][k]+p[i][j][k])*v[l][i][j][k];
 			}
 		}
 	}
