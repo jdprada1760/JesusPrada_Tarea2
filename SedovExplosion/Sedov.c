@@ -1,12 +1,12 @@
 /*
  * This program simulates a Sedov explosion in a cube with side 256m at 300K and 1atm
- * The blast liberates 10**10J from a cube of 2m (4?) in the center of the cube
- * Spatial resolution is 2m (1?) in each direction
+ * The blast liberates 10**10J from a cube of 2m in the center of the cube
+ * Spatial resolution is 2m  in each direction
  * Method used is finite volumes to solve Euler equations
  * This code STOPS when the shock wave is of 120m of radius
  * Prints radial density at r= 10,60,120m
- * We will assume rho_ini = 1kg/m3
- *
+ * We will assume gass treated is nitrogen as it composes most of atmospheric gas
+ * EULER EQUATION FORMALISM IS OBTAINED FROM ****** http://197.14.51.10:81/pmb/GENIE_DES_PROCEDES/An%20Introduction%20to%20Scientific%20Computing%20Twelve%20Computational%20Projects%20Solved%20with%20MATLAB.pdf  ***** page 215
  */
 
 #include <stdio.h>
@@ -17,27 +17,26 @@
 //------------------------------------------------------------------------------
 //   DEFINITIONS & METHODS
 //------------------------------------------------------------------------------
-/*
- * FLOAT: data precision
- * atm  : atmospheric pressure in Pa
- * cv   : Constant volume heat capacity of the gas (divided by constant R)
- * gamma: Adiabatic constant of the gas
- */
-
 #define man "./sedov.x "
 #define FLOAT float
+// 1atm in Pa
 #define atm 101325
-#define cv (3.0/2.0)
+// Boltzmann constant divided by NITROGEN molecular mass (Nitrogen assumed)
+#define R 296.803 
+// Adiabatic coefficient
 #define gamma (5.0/3.0)
+// Boolean definitions
 #define bool int
 #define true 1
 #define false 0
+
+
 void allocateAll();
 int indexx(int i, int j, int k);
 void __init__();
 FLOAT getDT(FLOAT dx);
 FLOAT*** allocate3d();
-FLOAT evolve(float dt,float dx);
+FLOAT evolve(FLOAT inv_vel);
 
 
 //------------------------------------------------------------------------------
@@ -58,9 +57,6 @@ FLOAT T;
 FLOAT p_ini;
 // Gas initial density
 FLOAT rho_ini;
-// Velocity v
-// Pressure p, internal energy e per unit mass, density rho, total energy E per unit volume
-FLOAT e_ini;
 
 /*
  * AUXILIAR VECTORS THAT FOLLOW WAVE EQ Ut + (d/dxi)Fi = 0
@@ -83,14 +79,12 @@ int main(int argc, char** argv){
 
 	// Temperature is 300K
 	T = 300.0;
-	// Initial gas density is 1kg/m3
-	rho_ini = 1.0;
 	// Pressure is atmospheric
 	p_ini = 1.0*atm;
+	// Initial gas density is calculated withstate equations rho*R*T = p (((((R is normal constant over molecular mass)))))
+	rho_ini = p_ini/(R*T);
 	// Blast is defined J/kg
 	blast = pow(10.0,10.0);
-	// Internal energy depends on pressure and volume: p = rho*e*(gamma-1)
-	e_ini = p_ini/(rho_ini*(gamma-1));
 	// N is defined (2 more for phantom) 
 	N = ((FLOAT)L)/((FLOAT)resol) + 2;
 	// Variables are allocated
@@ -107,16 +101,17 @@ int main(int argc, char** argv){
 	// Time variable t, deltas in position and time: dx,dt
 	FLOAT time = 0;
 	FLOAT dx = resol;
-	FLOAT dt = dx/sqrt(rho_ini*gamma*(gamma-1)*blast);
+	// Stores inverse of velocity ((((initial velocity is equal to sqrt(gamma*R*T))))
+	FLOAT inv_vel = 1.0/sqrt(gamma*R*T);
 	bool go_on = true;
 
 	do{	
-		printf("%f,%f\n",time,dt);
+		printf("%f,%f\n",time,dx*inv_vel);
 		// Evolves vector U, actualizes dt
-		dt = evolve(dt,dx);
+		inv_vel = evolve(inv_vel);
 		printf("aal iis weell (EVOLVE)\n");
-
-		time+=dt;
+		// 1/inv_vel = vel = dx/dt
+		time+=dx*inv_vel;
 
 	} while(go_on);
 	return 0;
@@ -159,7 +154,7 @@ void __init__(){
 
 	int i,j,l,m,n;
 	// Initial velocity and Energy density are defined E = rho(e+0.5v**2)
-	FLOAT E_ini = rho_ini*e_ini;
+	FLOAT E_ini = p_ini/(gamma-1);
 	FLOAT* v = malloc(3*sizeof(FLOAT));
 	v[0] = 0;
 	v[1] = 0;
@@ -176,7 +171,7 @@ void __init__(){
 						F[j][i][l][m][n] = rho_ini*v[j]*v[i-1] + (j==(i-1))*p_ini;
 						//delta_j,i-1 = (j==(i-1))
 					}
-					F[j][4][l][m][n] = (rho_ini*E_ini+p_ini)*v[j];
+					F[j][4][l][m][n] = (E_ini+p_ini)*v[j];
 				}
 
 				// Defining U
@@ -184,25 +179,25 @@ void __init__(){
 				for( i = 1; i < 4; i++ ){
 						U[i][l][m][n] = rho_ini*v[i-1];
 				}
-				U[4][l][m][n] = rho_ini*E_ini;
+				U[4][l][m][n] = E_ini;
 
 			}
 		}
 	}
 
 	// Corrects for the blast
-	E_ini = rho_ini*blast;
-	FLOAT p_blast =  (gamma-1)*blast;
+	FLOAT E_blast = rho_ini*blast;
+	FLOAT p_blast =  (gamma-1)*blast*rho_ini;
 	// Defining F
 	for( j = 0; j < 3; j++ ){
 		for( i = 1; i < 4; i++ ){
 			F[j][i][N/2][N/2][N/2] = rho_ini*v[j]*v[i-1] + (j==(i-1))*p_blast;
 			//delta_j,i-1 = (j==(i-1))
 		}
-		F[j][4][N/2][N/2][N/2] = (rho_ini*E_ini+p_ini)*v[j];
+		F[j][4][N/2][N/2][N/2] = (E_blast+p_blast)*v[j];
 	}
 
-	U[4][N/2][N/2][N/2] = rho_ini*E_ini;
+	U[4][N/2][N/2][N/2] = E_blast;
 	free(v);
 }
 
@@ -216,11 +211,10 @@ void __init__(){
  * Values of variables on surfaces are calculated as the mean of the adjacent volumes
  * Boundary conditions are taken as free boundary :
  * (directional derivative perpendicular to the boundary surface vanishes) (This vanishes the respective surface integral)
- * !!!RETURN!!! This method returns the time difference dt for the other time step
- * delta in time is calculated according to the sound speed boundary which defines stability
+ * !!!RETURN!!! This method returns the inverse of maximum velocity for the other time step
  *
  */
-FLOAT evolve(float dt,float dx){
+FLOAT evolve(FLOAT inv_vel){
 	// Creates new array to avoid over-evolving
 	int i,j,k,l,m;
 	FLOAT**** U_new = malloc(5*sizeof(FLOAT***));
@@ -244,7 +238,7 @@ FLOAT evolve(float dt,float dx){
 			for( j = 1; j < N-1; j++){
 				for( k = 1; k < N-1; k++){
 
-					U_new[l][i][j][k]=U[l][i][j][k]-(0.5*dt/dx)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
+					U_new[l][i][j][k]=U[l][i][j][k]-(0.5*inv_vel)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
 					-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]-F[2][l][i][j][k-1]);
 
 				}
@@ -259,7 +253,7 @@ FLOAT evolve(float dt,float dx){
 
  
 	// Temporal variables
-	FLOAT rho,e,E,p;
+	FLOAT rho,E,p;
 	FLOAT* v = malloc(3*sizeof(FLOAT));
 
 	for( i = 1; i < N-1; i++){
@@ -278,12 +272,10 @@ FLOAT evolve(float dt,float dx){
 				v[1] = U[2][i][j][k]/rho;
 				v[2] = U[3][i][j][k]/rho;
 				E    = U[4][i][j][k];
-				e    = (E/rho) - 0.5*(pow(v[0],2)+pow(v[1],2)+pow(v[2],2));
-				p    = (gamma-1)*rho*e;
+				p    = (gamma-1)*(E-0.5*rho*(pow(v[0],2)+pow(v[1],2)+pow(v[2],2)));
 
 				// Calculates sound speed and verifies maximum for sound speed and velocities
-				//FLOAT c_now = sqrt((gamma+1)*(E[i][j][k]+p[i][j][k]/rho[i][j][k])); DANGER
-				FLOAT c_now = sqrt((gamma+1)*(E+p));
+				FLOAT c_now = sqrt((gamma)*(p/rho));
 				if( c_now > cmax ){
 					cmax = c_now;
 				}
@@ -333,8 +325,8 @@ FLOAT evolve(float dt,float dx){
 	free(U_new);
 	free(v);
 	
-	// RETURNS delta time
-	return dx/(vmax+cmax);
+	// RETURNS inverse of maximum velocity
+	return 1.0/(vmax+cmax);
 }
 
 
