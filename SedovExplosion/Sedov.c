@@ -37,7 +37,9 @@ void __init__();
 FLOAT getDT(FLOAT dx);
 FLOAT*** allocate3d();
 FLOAT evolve(FLOAT inv_vel);
-
+void get_radius();
+// Actual radius of the blast wave
+FLOAT radius;
 
 //------------------------------------------------------------------------------
 //   GLOBAL VARIABLES
@@ -69,6 +71,8 @@ FLOAT rho_ini;
  */             
 FLOAT**** U;
 FLOAT***** F;
+// File to write 
+FILE* towrite;
 
 //------------------------------------------------------------------------------
 //   MAIN
@@ -93,6 +97,8 @@ int main(int argc, char** argv){
 	// Variables are initialised
 	__init__();
 	printf("aal iis weell (INITIALIZATION)\n");
+	// File to write
+	//towrite = fopen(argv[1],"w");
 
 	   ///////////////////////////
 	  //  TIME EVOLUTION       //
@@ -106,12 +112,13 @@ int main(int argc, char** argv){
 	bool go_on = true;
 
 	do{	
-		printf("%f,%f\n",time,dx*inv_vel);
 		// Evolves vector U, actualizes dt
 		inv_vel = evolve(inv_vel);
 		printf("aal iis weell (EVOLVE)\n");
 		// 1/inv_vel = vel = dx/dt
 		time+=dx*inv_vel;
+		get_radius();
+		printf("%f____%f____%f,\n",time,dx*inv_vel,radius);
 
 	} while(go_on);
 	return 0;
@@ -223,7 +230,7 @@ FLOAT evolve(FLOAT inv_vel){
 		U_new[i] = allocate3d();
 	}
 
-	// Temporal variables to deduce maximum velocity and sound speed
+	// Temporal variables to deduce maximum velocity and sound
 	FLOAT cmax = -1;
 	FLOAT vmax = -1;
 
@@ -347,6 +354,25 @@ FLOAT*** allocate3d(){
 }
 
 
+/*
+ * Gets the radius of the blast
+ *
+ */
+void get_radius(){
+	
+	int i;
+	int maxind;
+	int maxrho = -1;
+	for ( i = N/2; i < N-1; i++){
+		if( U[0][i][N/2][N/2] > maxrho ){
+			maxrho = U[0][i][N/2][N/2];
+			maxind = i;
+		}
+	}
+	// abs(maxind - N/2)*dx is the radius
+	radius = abs(maxind - N/2)*resol;
+
+}
 
 
 
