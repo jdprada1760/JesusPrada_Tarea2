@@ -32,14 +32,14 @@
 
 
 void allocateAll();
-int indexx(int i, int j, int k);
 void __init__();
 FLOAT getDT(FLOAT dx);
 FLOAT*** allocate3d();
 FLOAT evolve(FLOAT inv_vel);
 void get_radius();
+void save();
 // Actual radius of the blast wave
-FLOAT radius;
+FLOAT radius = -1;
 
 //------------------------------------------------------------------------------
 //   GLOBAL VARIABLES
@@ -49,8 +49,8 @@ FLOAT radius;
 int L = 256;
 // Spatial resolution in m
 int resol = 2;
-// Size of the tridimentional arrays
-int N;
+// Size of the tridimentional arrays and its half
+int N, halfN;
 // Blast energy liberated in joules/kg (from little square at the center)
 FLOAT blast;
 // Gas temperature in Kelvin
@@ -72,7 +72,8 @@ FLOAT rho_ini;
 FLOAT**** U;
 FLOAT***** F;
 // File to write 
-FILE* towrite;
+FILE* density;
+FILE* energy;
 
 //------------------------------------------------------------------------------
 //   MAIN
@@ -91,6 +92,7 @@ int main(int argc, char** argv){
 	blast = pow(10.0,10.0);
 	// N is defined (2 more for phantom) 
 	N = ((FLOAT)L)/((FLOAT)resol) + 2;
+	halfN = N/2;
 	// Variables are allocated
 	allocateAll();
 	printf("aal iis weell (ALLOCATION)N=%d\n",N);
@@ -98,7 +100,9 @@ int main(int argc, char** argv){
 	__init__();
 	printf("aal iis weell (INITIALIZATION)\n");
 	// File to write
-	//towrite = fopen(argv[1],"w");
+	density = fopen("Density_sedov.data","w");
+	energy = fopen("energy_sedov.data","w");
+
 
 	   ///////////////////////////
 	  //  TIME EVOLUTION       //
@@ -108,19 +112,25 @@ int main(int argc, char** argv){
 	FLOAT time = 0;
 	FLOAT dx = resol;
 	// Stores inverse of velocity ((((initial velocity is equal to sqrt(gamma*R*T))))
-	FLOAT inv_vel = 1.0/sqrt(gamma*R*T);
+	FLOAT p_blast = rho_ini*((gamma-1)*blast);
+	FLOAT inv_vel = 1.0/sqrt(gamma*p_blast/rho_ini);
 	bool go_on = true;
-
+	int ji = 0;
 	do{	
 		// Evolves vector U, actualizes dt
+		printf("%f____%f____%f,\n",time,dx*inv_vel,radius);
 		inv_vel = evolve(inv_vel);
 		printf("aal iis weell (EVOLVE)\n");
 		// 1/inv_vel = vel = dx/dt
 		time+=dx*inv_vel;
-		get_radius();
-		printf("%f____%f____%f,\n",time,dx*inv_vel,radius);
+		save();
+
+		if(ji>20){ go_on = false;}
+		ji++;
 
 	} while(go_on);
+	fclose(density);
+	fclose(energy);
 	return 0;
 }
 
@@ -192,9 +202,9 @@ void __init__(){
 		}
 	}
 
-	// Corrects for the blast
+	// Corrects for the blast (Assume energy is created by overdensity)
 	FLOAT E_blast = rho_ini*blast;
-	FLOAT p_blast =  (gamma-1)*blast*rho_ini;
+	FLOAT p_blast = rho_ini*((gamma-1)*blast);
 	// Defining F
 	for( j = 0; j < 3; j++ ){
 		for( i = 1; i < 4; i++ ){
@@ -203,7 +213,6 @@ void __init__(){
 		}
 		F[j][4][N/2][N/2][N/2] = (E_blast+p_blast)*v[j];
 	}
-
 	U[4][N/2][N/2][N/2] = E_blast;
 	free(v);
 }
@@ -355,7 +364,7 @@ FLOAT*** allocate3d(){
 
 
 /*
- * Gets the radius of the blast
+ * Averages over density spherically and saves it
  *
  */
 void get_radius(){
@@ -363,14 +372,73 @@ void get_radius(){
 	int i;
 	int maxind;
 	int maxrho = -1;
-	for ( i = N/2; i < N-1; i++){
+	for ( i = N/2; i < N-2; i++){
+		fprintf(density,"%f,",U[0][i][N/2][N/2]);
+		fprintf(energy,"%f,",U[4][i][N/2][N/2]);
 		if( U[0][i][N/2][N/2] > maxrho ){
 			maxrho = U[0][i][N/2][N/2];
 			maxind = i;
 		}
 	}
+	fprintf(density,"%f\n",U[0][N-2][N/2][N/2]);
+	fprintf(energy,"%f\n",U[4][N-2][N/2][N/2]);
 	// abs(maxind - N/2)*dx is the radius
 	radius = abs(maxind - N/2)*resol;
+
+}
+
+void save(){
+	// indie is the index 
+	
+	int i,j,k, indie;
+	// Auxiliar arrays to calculate rho_prom
+	FLOAT* rhoprom = malloc((halfN+1)*sizeof(FLOAT));
+	int* count = malloc((halfN+1)*sizeof(int));
+	for ( i = 0; i < (halfN+1); i++){
+		//printf("JIJIJI___%d___%d\n",i, halfN+1);
+		rhoprom[i] = 0;
+		count[i] = 0;	
+	}
+	
+	for ( i = 0; i < N; i++){
+		for ( j = 0; j < N; j++){
+			for ( k = 0; k < N; k++){
+				indie = (0.5*(sqrt((pow((2*i-N),2)+pow((2*j-N),2)+pow((2*k-N),2)))));
+				if(indie < halfN+1){
+					// schock wave does not reach sides of the cube. Not even its corners
+					rhoprom[indie] += U[0][i][j][k];
+					count[indie] += 1;
+					//printf("JIJIJI___%d___%d\n",indie, halfN+1);
+				}
+			}
+		}
+	}
+	for ( i = 0; i <  halfN; i++){
+		//printf("num___%d\n",i);
+		if( count[i] != 0 ){
+			rhoprom[i]  = rhoprom[i]/count[i];
+		}
+		else{
+			rhoprom[i]  = 0;
+		}
+		fprintf(density,"%f,",rhoprom[i]);
+		//printf("JIJIJI___%d___%d\n",i, halfN);
+	}
+	if( count[halfN] != 0 ){
+		rhoprom[halfN]  = rhoprom[halfN]/count[halfN];
+	}
+	else{
+		rhoprom[halfN]  = 0;
+	}
+	fprintf(density,"%f\n",rhoprom[halfN]);
+
+	
+	
+	//free(rhoprom);
+	//free(count);
+	//fprintf(energy,"%f\n",U[4][N-2][N/2][N/2]);
+	// abs(maxind - N/2)*dx is the radius
+	//radius = abs(maxind - N/2)*resol;
 
 }
 
