@@ -18,7 +18,7 @@
 //   DEFINITIONS & METHODS
 //------------------------------------------------------------------------------
 #define man "./sedov.x "
-#define FLOAT double
+#define FLOAT float
 // 1atm in Pa
 #define atm 101325
 // Boltzmann constant divided by NITROGEN molecular mass (Nitrogen assumed)
@@ -91,7 +91,7 @@ int main(int argc, char** argv){
 	// Initial gas density is calculated withstate equations rho*R*T = p (((((R is normal constant over molecular mass)))))
 	rho_ini = p_ini/(R*T);
 	// Blast is defined J/kg
-	blast = pow(10.0,10.0);
+	blast = pow(10.0,8.0);
 	// N is defined (2 more for phantom 
 	N = ((FLOAT)L)/((FLOAT)resol) + 4;
 	halfN = N/2;
@@ -121,7 +121,7 @@ int main(int argc, char** argv){
 	
 	do{	
 		// Evolves vector U, actualizes dt
-		printf("%f____%f____%f,\n",time,dx*inv_vel,radius);
+		printf("%f____%f____%f__________________%f,%f\n",time,dx*inv_vel,radius,U[0][halfN+5][halfN][halfN],U[1][halfN+5][halfN][halfN]);
 		inv_vel = evolve(inv_vel);
 		printf("aal iis weell (EVOLVE)\n");
 		// 1/inv_vel = vel = dx/dt
@@ -285,14 +285,14 @@ FLOAT evolve(FLOAT inv_vel){
 
 				// From auxiliar variable U to usual variables rho,p,E,v
 				rho  = U[0][i][j][k];
-				if( rho < 0 ){ rho = 0; }
+				//if( rho < 0 ){ rho = 0; }
 				v[0] = U[1][i][j][k]/rho;
 				v[1] = U[2][i][j][k]/rho;
 				v[2] = U[3][i][j][k]/rho;
 				E    = U[4][i][j][k];
-				if( E < 0 ){ E = 0; }
+				//if( E < 0 ){ E = 0; }
 				p    = (gamma-1)*(E-0.5*rho*(pow(v[0],2)+pow(v[1],2)+pow(v[2],2)));
-				if( p < 0 ){ p = 0; }
+				//if( p < 0 ){ p = 0; }
 
 				// Calculates sound speed and verifies maximum for sound speed and velocities
 				FLOAT c_now = sqrt((gamma)*(p/rho));
@@ -449,6 +449,7 @@ void save(){
 
 // gets area flux according to TVD-Roe scheme with superbee flux limiter
 // n is component from vectors u and F. Axis is the axis in which flux is going to be calculated
+// https://tspace.library.utoronto.ca/bitstream/1807/14332/1/MQ45872.pdf
 FLOAT get_axis_flux( int i, int j, int k, int axis, int n ){
 	// indices of the points ll(-2), l(-1), c(0), r(+1), rr(+2)
 	int** indices = malloc(5*sizeof(int*));
@@ -487,11 +488,18 @@ FLOAT get_axis_flux( int i, int j, int k, int axis, int n ){
 	// ratio + in i+3/2
 	FLOAT mr_32 = (F[axis][n][indices[2][0]][indices[2][1]][indices[2][2]]-f_12)/(F[axis][n][indices[3][0]][indices[3][1]][indices[3][2]]-f_32);
 	
-	free(indices);
 	// Contribution from r+ and r-
-	return (1.0 + 0.5*flux_limiter(pr_m12) -0.5*flux_limiter(pr_m32)/(pr_m32))*(F[axis][n][indices[2][0]][indices[2][1]][indices[2][2]]-f_m12)
-		+ (1.0 + 0.5*flux_limiter(mr_12) -0.5*flux_limiter(mr_32)/(mr_32))*(f_12-F[axis][n][indices[2][0]][indices[2][1]][indices[2][2]]);
-
+	FLOAT temp1 = (1.0 + 0.5*flux_limiter(pr_m12) -0.5*flux_limiter(pr_m32)/(pr_m32))*(F[axis][n][indices[2][0]][indices[2][1]][indices[2][2]]-f_m12);
+	FLOAT temp2 = (1.0 + 0.5*flux_limiter(mr_12) -0.5*flux_limiter(mr_32)/(mr_32))*(f_12-F[axis][n][indices[2][0]][indices[2][1]][indices[2][2]]);
+	
+	for( l = 0; l < 5; l++ ){
+		free(indices[l]);
+	}
+	free(indices);
+	
+	if( pr_m32 == 0 || isnan(pr_m32) || isnan(pr_m12)  ){ temp1 = 0;}
+	if( mr_32 == 0 || isnan(mr_32) || isnan(mr_12) ){ temp2 = 0;}
+	return temp1+temp2;
 
 
 }
