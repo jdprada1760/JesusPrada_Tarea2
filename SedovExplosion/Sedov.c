@@ -42,6 +42,7 @@ FLOAT get_axis_flux( int i, int j, int k, int axis, int n );
 FLOAT flux_limiter( FLOAT r );
 // Actual radius of the blast wave
 FLOAT radius = -1;
+FLOAT time;
 
 //------------------------------------------------------------------------------
 //   GLOBAL VARIABLES
@@ -75,7 +76,7 @@ FLOAT**** U;
 FLOAT***** F;
 // File to write 
 FILE* density;
-FILE* energy;
+FILE* times;
 
 //------------------------------------------------------------------------------
 //   MAIN
@@ -103,7 +104,7 @@ int main(int argc, char** argv){
 	printf("aal iis weell (INITIALIZATION)\n");
 	// File to write
 	density = fopen("Density_sedov.data","w");
-	energy = fopen("energy_sedov.data","w");
+	times = fopen("Times_sedov.data","w");
 
 
 	   ///////////////////////////
@@ -111,7 +112,7 @@ int main(int argc, char** argv){
 	 ///////////////////////////
 
 	// Time variable t, deltas in position and time: dx,dt
-	FLOAT time = 0;
+	time = 0;
 	FLOAT dx = resol;
 	// Stores inverse of velocity ((((initial velocity is equal to sqrt(gamma*R*T))))
 	FLOAT p_blast = rho_ini*((gamma-1)*blast);
@@ -126,7 +127,8 @@ int main(int argc, char** argv){
 		printf("aal iis weell (EVOLVE)\n");
 		// 1/inv_vel = vel = dx/dt
 		time+=dx*inv_vel;
-		save();
+		//save();
+		get_radius();
 
 		if(ji>40){ go_on = false;}
 		ji++;
@@ -134,7 +136,7 @@ int main(int argc, char** argv){
 	} while(go_on);
 
 	fclose(density);
-	fclose(energy);
+	fclose(times);
 	return 0;
 }
 
@@ -347,7 +349,7 @@ FLOAT evolve(FLOAT inv_vel){
 	free(v);
 	
 	// RETURNS inverse of maximum velocity
-	return 1.0/(vmax+cmax);
+	return 10.0/(vmax+cmax);
 }
 
 
@@ -377,18 +379,19 @@ void get_radius(){
 	int i;
 	int maxind;
 	int maxrho = -1;
-	for ( i = N/2; i < N-2; i++){
+	for ( i = 2; i < N-2; i++){
 		fprintf(density,"%f,",U[0][i][N/2][N/2]);
-		fprintf(energy,"%f,",U[4][i][N/2][N/2]);
+		//fprintf(energy,"%f,",U[4][i][N/2][N/2]);
 		if( U[0][i][N/2][N/2] > maxrho ){
 			maxrho = U[0][i][N/2][N/2];
 			maxind = i;
 		}
 	}
 	fprintf(density,"%f\n",U[0][N-2][N/2][N/2]);
-	fprintf(energy,"%f\n",U[4][N-2][N/2][N/2]);
+	//fprintf(energy,"%f\n",U[4][N-2][N/2][N/2]);
 	// abs(maxind - N/2)*dx is the radius
 	radius = abs(maxind - N/2)*resol;
+	fprintf(times,"%f\n",time);
 
 }
 
@@ -436,6 +439,7 @@ void save(){
 		rhoprom[halfN]  = 0;
 	}
 	fprintf(density,"%f\n",rhoprom[halfN]);
+	fprintf(times,"%f\n",time);
 
 	
 	
