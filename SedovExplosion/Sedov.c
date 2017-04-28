@@ -89,7 +89,7 @@ int main(int argc, char** argv){
 	// Initial gas density is calculated withstate equations rho*R*T = p (((((R is normal constant over molecular mass)))))
 	rho_ini = p_ini/(R*T);
 	// Blast is defined J/kg
-	blast = pow(10.0,10.0);
+	blast = pow(10.0,3.0);
 	// N is defined (2 more for phantom) 
 	N = ((FLOAT)L)/((FLOAT)resol) + 2;
 	halfN = N/2;
@@ -125,7 +125,7 @@ int main(int argc, char** argv){
 		time+=dx*inv_vel;
 		save();
 
-		if(ji>20){ go_on = false;}
+		if(ji>100){ go_on = false;}
 		ji++;
 
 	} while(go_on);
@@ -248,14 +248,58 @@ FLOAT evolve(FLOAT inv_vel){
 	 //   Evolution of Unew    //
 	////////////////////////////
 	
+	// Temporal velocities 
+	FLOAT vE,vW,vN,vS,vUp,vDown;
+	// Temporal F values
+	FLOAT F_E,F_W,F_N,F_S,F_Up,F_Down;
+	
+	for( i = 1; i < N-1; i++){
+		for( j = 1; j < N-1; j++){
+			for( k = 1; k < N-1; k++){
 
-	for( l = 0; l < 5; l++){
-		for( i = 1; i < N-1; i++){
-			for( j = 1; j < N-1; j++){
-				for( k = 1; k < N-1; k++){
+				// Gets all velocities of the faces: V_{E,W,N,S,Up,Down} Average scheme is taken for velocities at faces
+				// these velocities are calculated to know the direction of the flow. factor of 2 from average is not necessary
+				vE    = ((U[1][i][j][k]/U[0][i][j][k])+(U[1][i+1][j][k]/U[0][i+1][j][k]));
+				vW    = -((U[1][i][j][k]/U[0][i][j][k])+(U[1][i-1][j][k]/U[0][i-1][j][k])); // minus is for we want (v\cot) n 
+				vN    = ((U[2][i][j][k]/U[0][i][j][k])+(U[2][i][j+1][k]/U[0][i][j+1][k]));
+				vS    = -((U[2][i][j][k]/U[0][i][j][k])+(U[2][i][j-1][k]/U[0][i][j-1][k])); // minus is for we want (v\cot) n 
+				vUp   = ((U[3][i][j][k]/U[0][i][j][k])+(U[3][i][j][k+1]/U[0][i][j][k+1]));
+				vDown = -((U[3][i][j][k]/U[0][i][j][k])+(U[3][i][j][k-1]/U[0][i][j][k-1])); // minus is for we want (v\cot) n
 
-					U_new[l][i][j][k]=U[l][i][j][k]-(0.5*inv_vel)*(F[0][l][i+1][j][k]+F[1][l][i][j+1][k]+F[2][l][i][j][k+1]
-					-F[0][l][i-1][j][k]-F[1][l][i][j-1][k]-F[2][l][i][j][k-1]);
+				for( l = 0; l < 5; l++){
+					
+					// UPWIND SCHEME of approximation mantains boundaries and smothens huge peaks
+					// Sometimes the smothening is a numerical disadvantage, but as we want to presence the evolution of the shockwave
+					// It is more of an advantage
+	
+					// Definitions of values of F at the faces according to upwind approximation
+					if( vE > 0){ F_E = F[0][l][i][j][k]; }				// Outflow: we use value at the inside
+					else if( vE < 0){ F_E = F[0][l][i+1][j][k]; }			// Inflow: we use value at the outside
+					else{ F_E = 0.5*(F[0][l][i][j][k]+F[0][l][i+1][j][k]); }	// Nullflow: we use the mean value
+					//
+					if( vW > 0){ F_W = F[0][l][i][j][k]; }
+					else if( vW < 0){ F_W = F[0][l][i-1][j][k]; }
+					else{ F_W = 0.5*(F[0][l][i][j][k]+F[0][l][i-1][j][k]); }
+					//
+					if( vN > 0){ F_N = F[1][l][i][j][k]; }
+					else if( vN < 0){ F_N = F[1][l][i][j+1][k]; }
+					else{ F_N = 0.5*(F[1][l][i][j][k]+F[1][l][i][j+1][k]); }
+					//
+					if( vS > 0){ F_S = F[1][l][i][j][k]; }
+					else if( vS < 0){ F_S = F[1][l][i][j-1][k]; }
+					else{ F_S = 0.5*(F[1][l][i][j][k]+F[1][l][i][j-1][k]); }
+					//
+					if( vUp > 0){ F_Up = F[2][l][i][j][k]; }
+					else if( vUp < 0){ F_Up = F[2][l][i][j][k+1]; }
+					else{ F_Up = 0.5*(F[2][l][i][j][k]+F[2][l][i][j][k+1]); }
+					//
+					if( vDown > 0){ F_Down = F[2][l][i][j][k]; }
+					else if( vDown < 0){ F_Down = F[2][l][i][j][k-1]; }
+					else{ F_Down = 0.5*(F[2][l][i][j][k]+F[2][l][i][j][k-1]); }
+					
+					// Now we calculate the next step in time
+					// inv_vel = dt/dx
+					U_new[l][i][j][k]=U[l][i][j][k]-(inv_vel)*( F_E + F_N + F_Up - F_W - F_S - F_Down );
 
 				}
 			}
